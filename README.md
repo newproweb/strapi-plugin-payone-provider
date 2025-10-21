@@ -12,6 +12,7 @@ A comprehensive Strapi plugin that integrates the Payone payment gateway into yo
 - [Usage](#usage)
   - [Admin Panel](#admin-panel)
   - [API Endpoints](#api-endpoints)
+- [Supported Payment Methods](#supported-payment-methods)
 - [Payment Operations](#payment-operations)
 - [Transaction History](#transaction-history)
 - [Troubleshooting](#troubleshooting)
@@ -20,12 +21,12 @@ A comprehensive Strapi plugin that integrates the Payone payment gateway into yo
 ## ✨ Features
 
 - **Payone API Integration**: Full integration with Payone's Server API (v3.10)
-- **Payment Operations**: 
+- **Payment Operations**:
   - Preauthorization (reserve funds)
   - Authorization (immediate charge)
-  - Capture (complete preauthorized transactions)
-  - Refund (return funds to customers)
-- **Admin Panel**: 
+  - Capture (complete preauthorized transactions) — currently Credit Card only
+  - Refund (return funds to customers) — currently Credit Card only
+- **Admin Panel**:
   - Easy configuration interface
   - Transaction history viewer with filtering
   - Payment testing tools
@@ -85,7 +86,7 @@ module.exports = {
   // ... other plugins
   'payone-provider': {
     enabled: true,
-    resolve: './src/plugins/payone-provider'
+    resolve: './src/plugins/payone-provider',
   },
 };
 ```
@@ -137,10 +138,10 @@ module.exports = {
         mid: 'YOUR_MERCHANT_ID',
         key: 'YOUR_PORTAL_KEY',
         mode: 'test', // or 'live'
-        api_version: '3.10'
-      }
-    }
-  }
+        api_version: '3.10',
+      },
+    },
+  },
 };
 ```
 
@@ -157,10 +158,10 @@ module.exports = {
         mid: process.env.PAYONE_MID,
         key: process.env.PAYONE_KEY,
         mode: process.env.PAYONE_MODE || 'test',
-        api_version: '3.10'
-      }
-    }
-  }
+        api_version: '3.10',
+      },
+    },
+  },
 };
 ```
 
@@ -178,7 +179,7 @@ After configuring your credentials:
 ### 2. Try a Test Payment
 
 1. Go to the **Payment Actions** tab
-2. Try a **Preauthorization** operation:
+2. Try a **Preauthorization** operation (currently test UI supports Credit Card only):
    - Amount: 1000 (equals 10.00 EUR in cents)
    - Reference: Leave empty for auto-generation
    - Click **"Execute Preauthorization"**
@@ -198,17 +199,20 @@ After configuring your credentials:
 The plugin adds a new menu item **"Payone Provider"** to your Strapi admin panel with three tabs:
 
 #### 1. Configuration Tab
+
 - Configure Payone API credentials
 - Test connection to Payone servers
 - Switch between test and live modes
 
 #### 2. Transaction History Tab
+
 - View all payment transactions
 - Filter by status, type, transaction ID, reference, or date range
 - View detailed request/response data for each transaction
 - Pagination support for large transaction lists
 
 #### 3. Payment Actions Tab
+
 - Test payment operations without writing code
 - Execute preauthorizations, authorizations, captures, and refunds
 - View real-time results and error messages
@@ -224,9 +228,11 @@ All content API endpoints require authentication via the `isAuth` policy. These 
 Base URL: `/api/payone-provider`
 
 ##### POST `/api/payone-provider/preauthorization`
+
 Reserve funds on a customer's card without immediate charge.
 
 **Request Body:**
+
 ```json
 {
   "amount": 1000,
@@ -248,6 +254,7 @@ Reserve funds on a customer's card without immediate charge.
 ```
 
 **Response:**
+
 ```json
 {
   "data": {
@@ -259,14 +266,19 @@ Reserve funds on a customer's card without immediate charge.
 ```
 
 ##### POST `/api/payone-provider/authorization`
+
 Immediately charge a customer's card.
 
 **Request Body:** (Same as preauthorization)
 
+> Note: For redirect-based methods (PayPal, Online Banking) you must provide `successurl`, `errorurl`, and `backurl`. The plugin will auto-fill safe defaults when missing, using `settings.return_base` or `PAYONE_RETURN_BASE`/`FRONTEND_URL`/`NEXT_PUBLIC_SITE_URL`.
+
 ##### POST `/api/payone-provider/capture`
+
 Complete a preauthorized transaction and capture the funds.
 
 **Request Body:**
+
 ```json
 {
   "txid": "123456789",
@@ -276,9 +288,11 @@ Complete a preauthorized transaction and capture the funds.
 ```
 
 ##### POST `/api/payone-provider/refund`
+
 Refund a captured transaction.
 
 **Request Body:**
+
 ```json
 {
   "txid": "123456789",
@@ -325,49 +339,86 @@ const processPayment = async (orderData) => {
         zip: orderData.zip,
         city: orderData.city,
         country: orderData.country,
-        email: orderData.email
+        email: orderData.email,
       },
       {
         headers: {
-          'Authorization': `Bearer ${yourAuthToken}`
-        }
+          Authorization: `Bearer ${yourAuthToken}`,
+        },
       }
     );
 
     if (preauth.data.data.status === 'APPROVED') {
       const txid = preauth.data.data.txid;
-      
+
       // Step 2: Capture the preauthorized amount
       const capture = await axios.post(
         'http://localhost:1337/api/payone-provider/capture',
         {
           txid: txid,
           amount: orderData.amount,
-          currency: 'EUR'
+          currency: 'EUR',
         },
         {
           headers: {
-            'Authorization': `Bearer ${yourAuthToken}`
-          }
+            Authorization: `Bearer ${yourAuthToken}`,
+          },
         }
       );
 
       return {
         success: true,
-        transactionId: txid
+        transactionId: txid,
       };
     }
   } catch (error) {
     console.error('Payment failed:', error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 };
 ```
 
 ## 💳 Payment Operations
+
+## ✅ Supported Payment Methods
+
+The plugin supports the following Payone clearing types. Required fields are listed per method. All methods also require the common customer and address fields shown below.
+
+Common required fields (all methods):
+
+- `amount` (in cents), `currency`, `reference` (max 20 chars; auto-normalized)
+- `firstname`, `lastname`, `email`, `telephonenumber`
+- `street`, `zip`, `city`, `country`
+
+Credit Card (`clearingtype = cc`):
+
+- Required: `cardtype` (V/M/A...), `cardpan`, `cardexpiredate` (MMyy), `cardcvc2`
+- Operations: preauthorization, authorization, capture, refund
+- Test payment in Admin currently supported for Credit Card only
+
+PayPal Wallet (`clearingtype = wlt`, `wallettype = PPE`):
+
+- Required: `successurl`, `errorurl`, `backurl` (redirect URLs)
+- Recommended shipping fields: `shipping_firstname`, `shipping_lastname`, `shipping_street`, `shipping_zip`, `shipping_city`, `shipping_country`
+- Operations: preauthorization, authorization (capture/refund roadmap)
+
+SEPA Direct Debit (`clearingtype = elv`):
+
+- Required: `iban`, `bic`, `bankaccountholder`, `bankcountry`
+- Operations: preauthorization, authorization (capture/refund roadmap)
+
+Online Banking/PNT (`clearingtype = sb`):
+
+- Required: `onlinebanktransfertype` (e.g. `PNT`), `bankcountry`, redirect URLs (`successurl`, `errorurl`, `backurl`)
+- Operations: authorization (capture/refund roadmap)
+
+Notes:
+
+- The plugin normalizes `reference` server-side to comply with Payone (alphanumeric only, max 20 chars, auto-generated fallback).
+- For redirect flows, the plugin auto-fills redirect URLs when missing using a base URL from settings or environment.
 
 ### Preauthorization vs Authorization
 
@@ -378,15 +429,19 @@ const processPayment = async (orderData) => {
 ### Capture
 
 After a successful preauthorization, you must capture the transaction to receive the funds. Captures can be:
+
 - **Full capture**: Capture the entire preauthorized amount
 - **Partial capture**: Capture less than the preauthorized amount
 
 ### Refund
 
 Refunds return money to the customer. Important notes:
+
 - Amount must be negative (e.g., -1000 for 10.00 EUR)
 - Requires a valid transaction ID (txid)
 - Requires a sequence number (start with 2, increment for each additional refund on same transaction)
+
+> Current limitation: Capture and Refund are implemented for Credit Card only. Support for PayPal/SEPA/Online Banking will be added in future updates.
 
 ## 📊 Transaction History
 
@@ -404,6 +459,7 @@ All payment operations are automatically logged to the transaction history. Each
 ### Filtering Transactions
 
 Use the filters in the Transaction History tab to find specific transactions:
+
 - **Status**: Filter by APPROVED, ERROR, etc.
 - **Type**: Filter by operation type
 - **Transaction ID**: Search by specific txid
@@ -417,6 +473,7 @@ Use the filters in the Transaction History tab to find specific transactions:
 **Problem**: "Authentication failed" or "Invalid credentials"
 
 **Solutions**:
+
 1. Verify your AID, Portal ID, Merchant ID, and Portal Key are correct
 2. Ensure you're using the correct mode (test/live)
 3. Check that your Payone account is active and not suspended
@@ -427,6 +484,7 @@ Use the filters in the Transaction History tab to find specific transactions:
 **Problem**: Transactions return ERROR status
 
 **Common Causes**:
+
 1. **Invalid card data**: Check card number, expiry date, and CVC
 2. **Insufficient funds**: Test cards may have limits
 3. **Duplicate reference**: Each transaction needs a unique reference
@@ -434,6 +492,7 @@ Use the filters in the Transaction History tab to find specific transactions:
 5. **Test mode restrictions**: Some features may be limited in test mode
 
 **Debug Steps**:
+
 1. Check the Transaction History for error codes and messages
 2. Review the raw response data for detailed error information
 3. Consult the Payone API documentation for error code meanings
@@ -444,6 +503,7 @@ Use the filters in the Transaction History tab to find specific transactions:
 **Problem**: Payone Provider menu item doesn't appear
 
 **Solutions**:
+
 1. Ensure the plugin is enabled in `config/plugins.js`
 2. Run `npm run build` to rebuild the admin panel
 3. Clear your browser cache and refresh
@@ -455,6 +515,7 @@ Use the filters in the Transaction History tab to find specific transactions:
 **Problem**: Content API endpoints return authorization errors
 
 **Solutions**:
+
 1. Ensure you're sending a valid authentication token
 2. Check that the `isAuth` policy is properly configured
 3. Verify your user has the necessary permissions
@@ -465,6 +526,7 @@ Use the filters in the Transaction History tab to find specific transactions:
 **Problem**: Transaction history is empty
 
 **Solutions**:
+
 1. Check that requests are actually reaching Payone (check server logs)
 2. Verify database write permissions
 3. Check for JavaScript errors in the browser console

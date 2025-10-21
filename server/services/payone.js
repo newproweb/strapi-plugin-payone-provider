@@ -5,6 +5,23 @@ const crypto = require("crypto");
 
 const POST_GATEWAY_URL = "https://api.pay1.de/post-gateway/";
 
+const normalizeReference = (input, fallbackPrefix = "REF") => {
+  try {
+    const raw = (input == null ? "" : String(input));
+    // Keep only alphanumeric characters
+    let normalized = raw.replace(/[^A-Za-z0-9]/g, "");
+    if (!normalized) {
+      normalized = `${fallbackPrefix}${Date.now()}`;
+    }
+    // Limit length to 20 chars (safe for PAYONE)
+    if (normalized.length > 20) normalized = normalized.slice(0, 20);
+    return normalized;
+  } catch (_) {
+    const fallback = `${fallbackPrefix}${Date.now()}`;
+    return fallback.slice(0, 20);
+  }
+};
+
 const buildClientRequestParams = (settings, params) => {
   const requestParams = {
     request: params.request,
@@ -31,6 +48,23 @@ const buildClientRequestParams = (settings, params) => {
     requestParams.customer_is_present = "yes";
 
   return requestParams;
+};
+
+// Ensure redirect URLs for redirect-based flows (wallet/online banking)
+const ensureRedirectUrls = (params, settings) => {
+  const redirectTypes = new Set(["wlt", "sb", "gp", "idl", "bct"]);
+  const type = (params.clearingtype || "").toLowerCase();
+  if (!redirectTypes.has(type)) return params;
+
+  const baseFromSettings = settings?.return_base?.replace(/\/$/, "");
+  const baseFromEnv = (process.env.PAYONE_RETURN_BASE || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  const base = baseFromSettings || baseFromEnv || "http://localhost:3000";
+
+  const withUrls = { ...params };
+  if (!withUrls.successurl) withUrls.successurl = `${base}/payone/return/success`;
+  if (!withUrls.errorurl) withUrls.errorurl = `${base}/payone/return/error`;
+  if (!withUrls.backurl) withUrls.backurl = `${base}/payone/return/back`;
+  return withUrls;
 };
 
 const toFormData = (requestParams) => {
@@ -75,6 +109,15 @@ module.exports = ({ strapi }) => ({
       if (!settings || !settings.aid || !settings.portalid || !settings.key) {
         throw new Error("Payone settings not configured");
       }
+
+      const reqType = params.request;
+      if (reqType === "authorization" || reqType === "preauthorization" || reqType === "refund") {
+        const prefix = reqType === "refund" ? "REF" : reqType === "preauthorization" ? "PRE" : "AUTH";
+        params.reference = normalizeReference(params.reference, prefix);
+      }
+
+      // Redirect URLs if required by payment flow
+      params = ensureRedirectUrls(params, settings);
 
       const requestParams = buildClientRequestParams(settings, params);
       const debugParams = { ...requestParams };
@@ -164,16 +207,91 @@ module.exports = ({ strapi }) => ({
     return response;
   },
 
+  addPaymentMethodParams(params) {
+    const updated = { ...params };
+    const clearingtype = updated.clearingtype || "cc";
+
+    switch (clearingtype) {
+      case "cc":
+        if (!updated.cardpan) updated.cardpan = "4111111111111111";
+        if (!updated.cardexpiredate) updated.cardexpiredate = "2512";
+        if (!updated.cardcvc2) updated.cardcvc2 = "123";
+        if (!updated.cardtype) updated.cardtype = "V";
+        break;
+
+      case "wlt":
+        if (!updated.wallettype) updated.wallettype = "PPE";
+        break;
+
+      case "elv":
+        if (!updated.bankcountry) updated.bankcountry = "DE";
+        if (!updated.iban) updated.iban = "DE89370400440532013000";
+        if (!updated.bic) updated.bic = "COBADEFFXXX";
+        if (!updated.bankaccountholder)
+          updated.bankaccountholder = `${updated.firstname || "Test"} ${updated.lastname || "User"}`;
+        break;
+
+      case "sb":
+        if (!updated.bankcountry) updated.bankcountry = "DE";
+        if (!updated.onlinebanktransfertype) updated.onlinebanktransfertype = "PNT";
+        break;
+
+      case "gp":
+        if (!updated.bankcountry) updated.bankcountry = "DE";
+        if (!updated.onlinebanktransfertype) updated.onlinebanktransfertype = "GPY";
+        break;
+
+      case "idl":
+        if (!updated.bankcountry) updated.bankcountry = "NL";
+        if (!updated.onlinebanktransfertype) updated.onlinebanktransfertype = "IDL";
+        break;
+
+      case "bct":
+        if (!updated.bankcountry) updated.bankcountry = "BE";
+        if (!updated.onlinebanktransfertype) updated.onlinebanktransfertype = "BCT";
+        break;
+
+      case "rec":
+        if (!updated.recurrence) updated.recurrence = "recurring";
+        break;
+
+      case "fnc":
+        if (!updated.financingtype) updated.financingtype = "fnc";
+        break;
+
+      case "iv":
+        if (!updated.invoicetype) updated.invoicetype = "invoice";
+        break;
+
+      default:
+        strapi.log.warn(`Unknown clearingtype: ${clearingtype}, using credit card defaults`);
+        if (!updated.cardpan) updated.cardpan = "4111111111111111";
+        if (!updated.cardexpiredate) updated.cardexpiredate = "2512";
+        if (!updated.cardcvc2) updated.cardcvc2 = "123";
+        if (!updated.cardtype) updated.cardtype = "V";
+        break;
+    }
+
+    if (!updated.salutation) updated.salutation = "Herr";
+    if (!updated.gender) updated.gender = "m";
+    if (!updated.telephonenumber) updated.telephonenumber = "01752345678";
+    if (!updated.ip) updated.ip = "127.0.0.1";
+    if (!updated.language) updated.language = "de";
+    if (!updated.customer_is_present) updated.customer_is_present = "yes";
+
+    return updated;
+  },
+
   async preauthorization(params) {
     strapi.log.info("Payone preauthorization called with params:", params);
 
     const requiredParams = {
       request: "preauthorization",
-      clearingtype: "cc", // Credit card
+      clearingtype: params.clearingtype || "cc",
       ...params
     };
 
-    if (!requiredParams.amount) requiredParams.amount = 1000; // 10.00 EUR in cents
+    if (!requiredParams.amount) requiredParams.amount = 1000;
     if (!requiredParams.currency) requiredParams.currency = "EUR";
     if (!requiredParams.reference)
       requiredParams.reference = `PREAUTH-${Date.now()}`;
@@ -184,19 +302,24 @@ module.exports = ({ strapi }) => ({
     if (!requiredParams.city) requiredParams.city = "Test City";
     if (!requiredParams.country) requiredParams.country = "DE";
     if (!requiredParams.email) requiredParams.email = "test@example.com";
-    if (!requiredParams.cardpan) requiredParams.cardpan = "4111111111111111";
-    if (!requiredParams.cardexpiredate) requiredParams.cardexpiredate = "2512";
-    if (!requiredParams.cardcvc2) requiredParams.cardcvc2 = "123";
 
-    return await this.sendRequest(requiredParams);
+    const updatedParams = this.addPaymentMethodParams(requiredParams);
+
+    return await this.sendRequest(updatedParams);
   },
 
   async authorization(params) {
     strapi.log.info("Payone authorization called with params:", params);
-    return await this.sendRequest({
+
+    const requiredParams = {
       request: "authorization",
+      clearingtype: params.clearingtype || "cc",
       ...params
-    });
+    };
+
+    const updatedParams = this.addPaymentMethodParams(requiredParams);
+
+    return await this.sendRequest(updatedParams);
   },
 
   async capture(params) {
@@ -339,7 +462,6 @@ module.exports = ({ strapi }) => ({
           new Date(transaction.timestamp) <= new Date(filters.date_to)
       );
     }
-
     return transactionHistory;
   },
 

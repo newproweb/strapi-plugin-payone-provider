@@ -14,7 +14,6 @@ import {
   Typography
 } from "@strapi/design-system";
 import { Check } from "@strapi/icons";
-import pluginId from "../../pluginId";
 import payoneRequests from "../../utils/api";
 import ConfigurationPanel from "./components/ConfigurationPanel";
 import HistoryPanel from "./components/HistoryPanel";

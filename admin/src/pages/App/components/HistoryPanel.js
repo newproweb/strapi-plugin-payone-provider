@@ -11,8 +11,7 @@ import {
   Divider
 } from "@strapi/design-system";
 import { Search } from "@strapi/icons";
-import StatusBadge from "./StatusBadge";
-import { formatTransactionData } from "./formatTransactionData";
+import TransactionHistoryItem from "./TransactionHistoryItem";
 
 const HistoryPanel = ({
   filters,
@@ -25,10 +24,9 @@ const HistoryPanel = ({
   totalPages,
   pageSize,
   onRefresh,
-  onPageChange,
-  selectedTransaction,
-  onTransactionSelect
+  onPageChange
 }) => {
+
   return (
     <Box
       hasRadius
@@ -47,7 +45,6 @@ const HistoryPanel = ({
         <Typography variant="beta" as="h2" marginBottom={2}>
           Transaction Management
         </Typography>
-
         {/* Filters */}
         <Box>
           <Box marginBottom={4}>
@@ -184,194 +181,10 @@ const HistoryPanel = ({
           ) : (
             <Box>
               {paginatedTransactions.map((transaction) => (
-                <Box key={transaction.id}>
-                  <Card
-                    style={{
-                      marginBottom: "8px",
-                      cursor: "pointer",
-                      border:
-                        selectedTransaction?.id === transaction.id
-                          ? "2px solid #4945ff"
-                          : "1px solid #e4e2e7",
-                      transition: "all 0.2s ease"
-                    }}
-                    onClick={() => onTransactionSelect(transaction)}
-                  >
-                    <CardBody padding={4}>
-                      <Flex
-                        justifyContent="space-between"
-                        alignItems="flex-start"
-                      >
-                        <Box style={{ flex: 1 }}>
-                          <Flex alignItems="center" gap={2} marginBottom={3}>
-                            <Typography
-                              variant="pi"
-                              fontWeight="bold"
-                              textColor="neutral800"
-                            >
-                              {transaction.request_type?.toUpperCase() ||
-                                "UNKNOWN"}
-                            </Typography>
-                            <StatusBadge status={transaction.status} />
-                          </Flex>
-
-                          <Stack spacing={2}>
-                            {(transaction.txid ||
-                              transaction.TxId ||
-                              transaction.tx_id ||
-                              transaction.transactionid ||
-                              transaction.transaction_id ||
-                              transaction.id) && (
-                              <Flex alignItems="center" gap={2}>
-                                <Typography
-                                  variant="pi"
-                                  textColor="neutral600"
-                                  style={{ minWidth: "60px" }}
-                                >
-                                  TxId:
-                                </Typography>
-                                <Typography variant="pi" fontWeight="medium">
-                                  {transaction.txid ||
-                                    transaction.TxId ||
-                                    transaction.tx_id ||
-                                    transaction.transactionid ||
-                                    transaction.transaction_id ||
-                                    transaction.id}
-                                </Typography>
-                              </Flex>
-                            )}
-
-                            {transaction.reference && (
-                              <Flex alignItems="center" gap={2}>
-                                <Typography
-                                  variant="pi"
-                                  textColor="neutral600"
-                                  style={{ minWidth: "60px" }}
-                                >
-                                  Ref:
-                                </Typography>
-                                <Typography variant="pi" fontWeight="medium">
-                                  {transaction.reference}
-                                </Typography>
-                              </Flex>
-                            )}
-
-                            {transaction.amount && (
-                              <Flex alignItems="center" gap={2}>
-                                <Typography
-                                  variant="pi"
-                                  textColor="neutral600"
-                                  style={{ minWidth: "60px" }}
-                                >
-                                  Amount:
-                                </Typography>
-                                <Typography variant="pi" fontWeight="medium">
-                                  {transaction.amount} {transaction.currency}
-                                </Typography>
-                              </Flex>
-                            )}
-
-                            <Flex alignItems="center" gap={2}>
-                              <Typography
-                                variant="pi"
-                                textColor="neutral600"
-                                style={{ minWidth: "60px" }}
-                              >
-                                Date:
-                              </Typography>
-                              <Typography variant="pi" fontWeight="medium">
-                                {new Date(
-                                  transaction.timestamp
-                                ).toLocaleString()}
-                              </Typography>
-                            </Flex>
-                          </Stack>
-                        </Box>
-                      </Flex>
-                    </CardBody>
-                  </Card>
-
-                  {/* Transaction Details - Show right after selected transaction */}
-                  {selectedTransaction?.id === transaction.id && (
-                    <Card>
-                      <CardBody padding={4}>
-                        <Stack spacing={3}>
-                          <Flex
-                            justifyContent="space-between"
-                            alignItems="center"
-                          >
-                            <Typography
-                              variant="pi"
-                              fontWeight="bold"
-                              textColor="neutral800"
-                            >
-                              Transaction Details
-                            </Typography>
-                            <Button
-                              variant="tertiary"
-                              size="S"
-                              onClick={() => onTransactionSelect(null)}
-                            >
-                              Close
-                            </Button>
-                          </Flex>
-
-                          <Divider />
-
-                          <Box>
-                            <Stack spacing={2}>
-                              {formatTransactionData(selectedTransaction)
-                                .slice(0, 8)
-                                .map((item, index) => (
-                                  <Flex
-                                    key={index}
-                                    justifyContent="space-between"
-                                    alignItems="start"
-                                    padding={2}
-                                  >
-                                    <Typography
-                                      variant="pi"
-                                      textColor="neutral700"
-                                      fontWeight="medium"
-                                      style={{ minWidth: "150px" }}
-                                    >
-                                      {item.key}:
-                                    </Typography>
-                                    <Typography
-                                      variant="pi"
-                                      textColor="neutral800"
-                                      style={{
-                                        flex: 1,
-                                        textAlign: "right",
-                                        wordBreak: "break-word",
-                                        maxWidth: "60%"
-                                      }}
-                                    >
-                                      {item.value}
-                                    </Typography>
-                                  </Flex>
-                                ))}
-                            </Stack>
-                          </Box>
-
-                          {formatTransactionData(selectedTransaction).length >
-                            8 && (
-                            <Box paddingTop={2}>
-                              <Typography
-                                variant="pi"
-                                textColor="neutral600"
-                                fontStyle="italic"
-                              >
-                                Showing first 8 fields. Full data available in
-                                transaction history.
-                              </Typography>
-                            </Box>
-                          )}
-                        </Stack>
-                      </CardBody>
-                    </Card>
-                  )}
-                </Box>
+                <TransactionHistoryItem
+                  key={transaction.id}
+                  transaction={transaction}
+                />
               ))}
 
               {/* Pagination */}
@@ -382,7 +195,7 @@ const HistoryPanel = ({
                   <CardBody padding={4}>
                     <Flex justifyContent="space-between" alignItems="center">
                       {transactionHistory.length > pageSize &&
-                      totalPages > 1 ? (
+                        totalPages > 1 ? (
                         <Flex gap={3} alignItems="center">
                           <Button
                             variant="default"

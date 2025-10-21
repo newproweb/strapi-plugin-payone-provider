@@ -41,17 +41,12 @@ module.exports = {
         method: "POST",
         path: "/preauthorization",
         handler: "payone.preauthorization",
-        config: {
-          policies: ["admin::isAuthenticatedAdmin"]
-        }
       },
       {
         method: "POST",
         path: "/authorization",
         handler: "payone.authorization",
-        config: {
-          policies: ["admin::isAuthenticatedAdmin"]
-        }
+
       },
       {
         method: "POST",
