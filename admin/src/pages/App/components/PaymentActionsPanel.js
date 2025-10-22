@@ -13,7 +13,7 @@ import {
 } from "@strapi/design-system";
 import { Play } from "@strapi/icons";
 import StatusBadge from "./StatusBadge";
-import { formatTransactionData } from "./formatTransactionData";
+import { formatTransactionData } from "../../utils/formatTransactionData";
 
 const PaymentActionsPanel = ({
   paymentAmount,

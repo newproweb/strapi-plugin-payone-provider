@@ -13,7 +13,6 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
 } from './icons';
-
 const TransactionHistoryItem = ({ transaction }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 

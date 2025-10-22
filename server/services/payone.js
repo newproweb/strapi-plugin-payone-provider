@@ -50,22 +50,6 @@ const buildClientRequestParams = (settings, params) => {
   return requestParams;
 };
 
-// Ensure redirect URLs for redirect-based flows (wallet/online banking)
-const ensureRedirectUrls = (params, settings) => {
-  const redirectTypes = new Set(["wlt", "sb", "gp", "idl", "bct"]);
-  const type = (params.clearingtype || "").toLowerCase();
-  if (!redirectTypes.has(type)) return params;
-
-  const baseFromSettings = settings?.return_base?.replace(/\/$/, "");
-  const baseFromEnv = (process.env.PAYONE_RETURN_BASE || process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
-  const base = baseFromSettings || baseFromEnv || "http://localhost:3000";
-
-  const withUrls = { ...params };
-  if (!withUrls.successurl) withUrls.successurl = `${base}/payone/return/success`;
-  if (!withUrls.errorurl) withUrls.errorurl = `${base}/payone/return/error`;
-  if (!withUrls.backurl) withUrls.backurl = `${base}/payone/return/back`;
-  return withUrls;
-};
 
 const toFormData = (requestParams) => {
   const formData = new URLSearchParams();
@@ -115,9 +99,6 @@ module.exports = ({ strapi }) => ({
         const prefix = reqType === "refund" ? "REF" : reqType === "preauthorization" ? "PRE" : "AUTH";
         params.reference = normalizeReference(params.reference, prefix);
       }
-
-      // Redirect URLs if required by payment flow
-      params = ensureRedirectUrls(params, settings);
 
       const requestParams = buildClientRequestParams(settings, params);
       const debugParams = { ...requestParams };

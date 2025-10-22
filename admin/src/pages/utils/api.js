@@ -1,5 +1,5 @@
 import { request } from "@strapi/helper-plugin";
-import pluginId from "../pluginId";
+import pluginId from "../../pluginId";
 
 const payoneRequests = {
   getSettings: () => {

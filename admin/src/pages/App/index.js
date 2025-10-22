@@ -14,7 +14,7 @@ import {
   Typography
 } from "@strapi/design-system";
 import { Check } from "@strapi/icons";
-import payoneRequests from "../../utils/api";
+import payoneRequests from "../utils/api";
 import ConfigurationPanel from "./components/ConfigurationPanel";
 import HistoryPanel from "./components/HistoryPanel";
 import PaymentActionsPanel from "./components/PaymentActionsPanel";
@@ -57,6 +57,9 @@ const App = () => {
   const [refundTxid, setRefundTxid] = useState("");
   const [refundSequenceNumber, setRefundSequenceNumber] = useState("2");
   const [refundReference, setRefundReference] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cc");
+  const [captureMode, setCaptureMode] = useState("full"); // full, partial
+
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentResult, setPaymentResult] = useState(null);
@@ -450,6 +453,10 @@ const App = () => {
                   setAuthReference={setAuthReference}
                   captureTxid={captureTxid}
                   setCaptureTxid={setCaptureTxid}
+                  setCaptureMode={setCaptureMode}
+                  captureMode={captureMode}
+                  paymentMethod={paymentMethod}
+                  setPaymentMethod={setPaymentMethod}
                   refundTxid={refundTxid}
                   setRefundTxid={setRefundTxid}
                   refundSequenceNumber={refundSequenceNumber}
